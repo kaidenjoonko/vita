@@ -4,23 +4,23 @@ Studies and organizations like the American Heart Association (AHA) and American
 
 ## How BP measurement goes wrong:
 1. Patient-related
-    Acute meal ingestion
-    Caffeine
-    Nicotine
-    Full bladder
-    Engaged in physical activity before
-        Not resting comfortably in a quiet env
+    * Acute meal ingestion
+    * Caffeine
+    * Nicotine
+    * Full bladder
+    * Engaged in physical activity before
+    * Not resting comfortably in a quiet env
 2. Procedure-related
-    Patient arm lower than heart
-    Patients legs are crossed
-    Talking 
+    * Patient arm lower than heart
+    * Patients legs are crossed
+    * Talking 
 3. Equipment-related
-    Cuff is too small/large
-    Outdated equipment
+    * Cuff is too small/large
+    * Outdated equipment
 4. Physician- or health professional-related
-    Failure to include a 5 minute reset period
-    Failure to make multiple measurements
-    Physician readings > nurse readings
+    * Failure to include a 5 minute reset period
+    * Failure to make multiple measurements
+    * Physician readings > nurse readings
 
 
 ## Our Vision
