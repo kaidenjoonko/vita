@@ -2,25 +2,25 @@
 ## The Problem
 Studies and organizations like the American Heart Association (AHA) and American Medical Association (AMA) have highlighted this issue. For instance, one study found that only 3% of patients measured their BP without error. Another states that inaccurate BP measurements can lead to inappropriate management decisions in 20% to 45% of cases. 
 
-4 big ways BP measurement goes wrong:
-    1. Patient-related
-        Acute meal ingestion
-        Caffeine
-        Nicotine
-        Full bladder
-        Engaged in physical activity before
+## How BP measurement goes wrong:
+1. Patient-related
+    Acute meal ingestion
+    Caffeine
+    Nicotine
+    Full bladder
+    Engaged in physical activity before
         Not resting comfortably in a quiet env
-    2. Procedure-related
-        Patient arm lower than heart
-        Patients legs are crossed
-        Talking 
-    3. Equipment-related
-        Cuff is too small/large
-        Outdated equipment
-    4. Physician- or health professional-related
-        Failure to include a 5 minute reset period
-        Failure to make multiple measurements
-        Physician readings > nurse readings
+2. Procedure-related
+    Patient arm lower than heart
+    Patients legs are crossed
+    Talking 
+3. Equipment-related
+    Cuff is too small/large
+    Outdated equipment
+4. Physician- or health professional-related
+    Failure to include a 5 minute reset period
+    Failure to make multiple measurements
+    Physician readings > nurse readings
 
 
 ## Our Vision
