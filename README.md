@@ -30,6 +30,6 @@ We are developing an intelligent, AI-driven assistant to help people accurately 
 ## Installation
 ```bash
 # Requires Python 3.12 or lower
-python -m venv bp-env
-source bp-env/bin/activate
+python -m venv vita-env
+source vita-env/bin/activate
 pip install -r requirements.txt
