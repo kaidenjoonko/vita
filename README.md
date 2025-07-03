@@ -24,7 +24,7 @@ Studies and organizations like the American Heart Association (AHA) and American
 
 
 ## Our Vision
-We are developing an intelligent, AI-driven assistant to help people accurately take their blood pressure at home. Blood pressure measurements are highly sensitive to user errors such as incorrect cuff placement, poor posture, or arm positioning. Our solution uses real-time computer vision and AI to guide users step-by-step, ensuring reliable and consistent readings.
+We are developing an intelligent, ML-driven assistant to help people accurately take their blood pressure at home. Blood pressure measurements are highly sensitive to user errors such as incorrect cuff placement, poor posture, or arm positioning. Our solution uses real-time computer vision and AI to guide users step-by-step, ensuring reliable and consistent readings.
 
 
 ## Installation
