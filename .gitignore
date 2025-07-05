@@ -1,0 +1,17 @@
+# Python virtual environment
+.venv/
+venv/
+
+# YOLOv8 runs output
+runs/
+
+# Roboflow or other big dataset folders
+bpcuff.v2i.yolov8/
+train/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# VS Code settings (optional)
+.vscode/
