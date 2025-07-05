@@ -1,12 +1,19 @@
 import cv2
 import mediapipe as mp
 import pyttsx3
+from ultralytics import YOLO
+import numpy as np
+
+# Initialize YOLO model
+model = YOLO("runs/detect/train2/weights/best.pt")
+
+
+# model.fuse()  # Uncomment when for final deployment
 
 # Initialize Text-to-Speech engine with Alex voice
 engine = pyttsx3.init()
 engine.setProperty('rate', 160)
 engine.setProperty('voice', 'com.apple.speech.synthesis.voice.Alex')
-
 last_feedback_spoken = ""
 
 def speak_if_changed(message):
@@ -40,9 +47,9 @@ def get_camera_alignment_feedback(landmarks, image_width, image_height):
             return "Move to show both shoulders clearly."
 
         shoulder_width = abs((rs.x - ls.x) * image_width)
-        if shoulder_width < 100:
+        if shoulder_width < 200:
             return "Move closer to the camera."
-        elif shoulder_width > 400:
+        elif shoulder_width > 410:
             return "Move farther from the camera."
 
         center_x = (ls.x + rs.x) / 2
@@ -59,13 +66,38 @@ def get_camera_alignment_feedback(landmarks, image_width, image_height):
     except:
         return "Unable to detect landmarks clearly."
 
+
+def check_cuff_placement(shoulder, elbow, cuff_center):
+    arm_vec = elbow - shoulder
+    cuff_vec = cuff_center - shoulder
+    arm_length = np.linalg.norm(arm_vec)
+
+    if arm_length == 0:
+        return "Arm not visible."
+
+    proj_length = np.dot(cuff_vec, arm_vec) / arm_length
+    position_ratio = proj_length / arm_length
+
+    if position_ratio < 0.53:
+        return "Cuff is too close to shoulder. Lower it."
+    elif position_ratio > 0.9:
+        return "Cuff is too close to elbow. Raise it."
+    else:
+        return "Cuff placement looks good."
+
+
+# ======================= Main Loop =======================
 while True:
     ret, frame = cap.read()
     if not ret:
         break
 
     height, width, _ = frame.shape
+
+    # Recolor to process
     img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+    # Make detections/process
     results = pose.process(img_rgb)
 
     feedback = "Position yourself in the camera frame."
@@ -76,26 +108,11 @@ while True:
 
         joints = {
             "L Shoulder": mp_pose.PoseLandmark.LEFT_SHOULDER,
-            "R Shoulder": mp_pose.PoseLandmark.RIGHT_SHOULDER,
             "L Elbow": mp_pose.PoseLandmark.LEFT_ELBOW,
+            "R Shoulder": mp_pose.PoseLandmark.RIGHT_SHOULDER,
             "R Elbow": mp_pose.PoseLandmark.RIGHT_ELBOW,
-            "L Wrist": mp_pose.PoseLandmark.LEFT_WRIST,
-            "R Wrist": mp_pose.PoseLandmark.RIGHT_WRIST,
-            "L Index": mp_pose.PoseLandmark.LEFT_INDEX,
-            "R Index": mp_pose.PoseLandmark.RIGHT_INDEX,
-            "L Thumb": mp_pose.PoseLandmark.LEFT_THUMB,
-            "R Thumb": mp_pose.PoseLandmark.RIGHT_THUMB,
             "L Hip": mp_pose.PoseLandmark.LEFT_HIP,
-            "R Hip": mp_pose.PoseLandmark.RIGHT_HIP,
-            "L Knee": mp_pose.PoseLandmark.LEFT_KNEE,
-            "R Knee": mp_pose.PoseLandmark.RIGHT_KNEE,
-            "L Ankle": mp_pose.PoseLandmark.LEFT_ANKLE,
-            "R Ankle": mp_pose.PoseLandmark.RIGHT_ANKLE,
-            "Nose": mp_pose.PoseLandmark.NOSE,
-            "L Ear": mp_pose.PoseLandmark.LEFT_EAR,
-            "R Ear": mp_pose.PoseLandmark.RIGHT_EAR,
-            "L Mouth": mp_pose.PoseLandmark.MOUTH_LEFT,
-            "R Mouth": mp_pose.PoseLandmark.MOUTH_RIGHT
+            "R Hip": mp_pose.PoseLandmark.RIGHT_HIP
         }
 
         for name, idx in joints.items():
@@ -104,14 +121,46 @@ while True:
                 cx, cy = int(lm.x * width), int(lm.y * height)
                 cv2.circle(frame, (cx, cy), 6, (0, 255, 0), -1)
                 cv2.putText(frame, name, (cx + 10, cy - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
-        feedback = get_camera_alignment_feedback(landmarks, width, height)
+        # Check camera alignment
+        alignment_feedback = get_camera_alignment_feedback(landmarks, width, height)
+        
+        # Check cuff placement if alignment is good
+        if alignment_feedback == "Camera alignment looks good.":
+            ls = landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER]
+            le = landmarks[mp_pose.PoseLandmark.LEFT_ELBOW]
+
+            if ls.visibility > 0.6 and le.visibility > 0.6:
+                shoulder = np.array([ls.x * width, ls.y * height])
+                elbow = np.array([le.x * width, le.y * height])
+
+                results_yolo = model.predict(frame, imgsz=640, conf=0.5)
+                cuff_found = False
+
+                for box in results_yolo[0].boxes.xyxy.cpu().numpy():
+                    x1, y1, x2, y2 = box
+                    cuff_center = np.array([(x1 + x2) / 2, (y1 + y2) / 2])
+
+                    cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
+                    cv2.circle(frame, (int(cuff_center[0]), int(cuff_center[1])), 6, (0, 0, 255), -1)
+
+                    feedback = check_cuff_placement(shoulder, elbow, cuff_center)
+                    cuff_found = True
+
+                if not cuff_found:
+                    feedback = "No cuff detected."
+
+            else:
+                feedback = "Arm not visible."
+        else:
+            feedback = alignment_feedback
+
+
         speak_if_changed(feedback)
 
     cv2.putText(frame, feedback, (30, 80),
-                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 4)
-
+    cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 4)
     cv2.imshow("Vita - Pose Detection", frame)
 
     if cv2.waitKey(1) & 0xFF == 27:  # ESC to quit
