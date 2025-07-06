@@ -170,3 +170,5 @@ cap.release()
 cv2.destroyAllWindows() #oqjeofiqjwe
 #oidjgfqw
 #12312
+#basdf;ijqwe;ofjqweofqwef
+#bfqefqwef
