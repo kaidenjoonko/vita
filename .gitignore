@@ -6,5 +6,9 @@ venv/
 __pycache__/
 *.pyc
 
+train/toohigh/Untitled.mov
+train/Correct/correct.mov
+train/toolow/Untitled copy.mov
+
 # VS Code settings (optional)
 .vscode/
