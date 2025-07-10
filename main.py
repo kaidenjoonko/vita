@@ -83,6 +83,23 @@ def check_cuff_placement(shoulder, elbow, cuff_center):
         return "Cuff is too close to elbow. Raise it."
     else:
         return "Cuff placement looks good."
+    
+def get_arm_angle_feedback(shoulder, elbow):
+    arm_vec = elbow - shoulder
+
+    armx = arm_vec[0]
+    army = arm_vec[1]
+
+    angle_deg = np.degrees(np.arctan2(army, armx))
+
+    angle_deg = abs(angle_deg)
+
+    if angle_deg > 45:
+        return "Keep your arm level."
+    elif angle_deg < 10:
+        return "Your arm is high. Lower it."
+    else:
+        return "Arm is at good angle."
 
 
 # ======================= Main Loop =======================
@@ -136,7 +153,12 @@ def main_loop():
                     shoulder = np.array([ls.x * width, ls.y * height])
                     elbow = np.array([le.x * width, le.y * height])
 
-                    results_yolo = model.predict(frame, imgsz=640, conf=0.5)
+                    try:
+                        results_yolo = model.predict(frame, imgsz=640, conf=0.5)
+                    except Exception as e:
+                        print(f"YOLO inference failed: {e}")
+                        results_yolo = []
+
                     cuff_found = False
 
                     for box in results_yolo[0].boxes.xyxy.cpu().numpy():
@@ -152,6 +174,11 @@ def main_loop():
                     if not cuff_found:
                         feedback = "No cuff detected."
 
+                    # Arm angle feedback
+                    arm_angle_feedback = get_arm_angle_feedback(shoulder, elbow)
+                    if arm_angle_feedback != "Arm is at good angle.":
+                        feedback = arm_angle_feedback
+
                 else:
                     feedback = "Arm not visible."
             else:
@@ -165,8 +192,9 @@ def main_loop():
 
         if cv2.waitKey(1) & 0xFF == 27:  # ESC to quit
             break
-
+    
     cap.release()
     cv2.destroyAllWindows()
 
     #qfweq
+main_loop()
