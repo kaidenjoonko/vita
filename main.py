@@ -94,7 +94,7 @@ def get_arm_angle_feedback(shoulder, elbow):
 
     angle_deg = abs(angle_deg)
 
-    if angle_deg > 45:
+    if angle_deg > 55:
         return "Keep your arm level."
     elif angle_deg < 10:
         return "Your arm is high. Lower it."
@@ -102,9 +102,34 @@ def get_arm_angle_feedback(shoulder, elbow):
         return "Arm is at good angle."
 
 
+def get_movement_feedback(prev, current):
+    """Compare previous and current landmarks. Return True if moving too much."""
+    if prev is None:
+        return False
+
+    total_movement = 0.0
+    count = 0
+
+    for i in range(len(prev)):
+        if prev[i].visibility > 0.5 and current[i].visibility > 0.5:
+            dx = current[i].x - prev[i].x
+            dy = current[i].y - prev[i].y
+            dist = np.sqrt(dx**2 + dy**2)
+            total_movement += dist
+            count += 1
+
+    if count == 0:
+        return False
+
+    avg_movement = total_movement / count
+    return avg_movement > 0.01  # Adjust threshold if needed
+
+
 # ======================= Main Loop =======================
 def main_loop():
-    global cap
+    global cap, prev_landmarks
+    prev_landmarks = None
+
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -183,6 +208,12 @@ def main_loop():
                     feedback = "Arm not visible."
             else:
                 feedback = alignment_feedback
+
+            # Movement feedback
+            if get_movement_feedback(prev_landmarks, landmarks) and alignment_feedback == "Camera alignment looks good.":
+                feedback = "Please stay still to get accurate reading."
+            prev_landmarks = landmarks  #for next loop
+
 
             speak_if_changed(feedback)
 
