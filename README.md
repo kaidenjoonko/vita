@@ -30,6 +30,9 @@ We are developing an intelligent, ML-driven assistant to help people accurately 
 ## Installation
 ```bash
 # Requires Python 3.12 or lower
-python -m venv vita-env
+brew install python@3.12
+# check using /opt/homebrew/bin/python3.12 --version , should return Python 3.12.x
+/opt/homebrew/bin/python3.12 -m venv vita-env
 source vita-env/bin/activate
+# check pyhton --version , should return Python 3.12.x
 pip install -r requirements.txt
