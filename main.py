@@ -1,174 +1,122 @@
 import cv2
 import mediapipe as mp
-import pyttsx3
 from ultralytics import YOLO
-import numpy as np
 
-# Initialize YOLO model
-model = YOLO("runs/detect/train2/weights/best.pt")
+from modules.alignment import check_camera_alignment
+from modules.posture import check_posture
+from modules.arm import check_arm
+from modules.cuff import check_cuff_placement
+from modules.feedback import FeedbackManager
 
+# ─────────────────────────────────────────────
+# CONSTANTS
+# ─────────────────────────────────────────────
 
-# model.fuse()  # Uncomment when for final deployment
+# Path to the trained YOLO cuff detection model
+MODEL_PATH = "runs/detect/train2/weights/best.pt"
 
-# Initialize Text-to-Speech engine with Alex voice
-engine = pyttsx3.init()
-engine.setProperty('rate', 160)
-engine.setProperty('voice', 'com.apple.speech.synthesis.voice.Alex')
-last_feedback_spoken = ""
+# Camera resolution
+FRAME_WIDTH = 1280
+FRAME_HEIGHT = 720
 
-def speak_if_changed(message):
-    global last_feedback_spoken
-    if message != last_feedback_spoken:
-        engine.say(message)
-        engine.runAndWait()
-        last_feedback_spoken = message
+# MediaPipe detection confidence thresholds
+POSE_DETECTION_CONFIDENCE = 0.5
+POSE_TRACKING_CONFIDENCE = 0.5
 
-# Initialize MediaPipe Pose
-mp_pose = mp.solutions.pose
-pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
-mp_draw = mp.solutions.drawing_utils
-
-# Start camera
-cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-
-cv2.namedWindow("Vita - Pose Detection", cv2.WINDOW_NORMAL)
-cv2.resizeWindow("Vita - Pose Detection", 1280, 720)
-cv2.moveWindow("Vita - Pose Detection", 100, 50)
-
-def get_camera_alignment_feedback(landmarks, image_width, image_height):
-    try:
-        ls = landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER]
-        rs = landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER]
-        lh = landmarks[mp_pose.PoseLandmark.LEFT_HIP]
-
-        if ls.visibility < 0.6 or rs.visibility < 0.6:
-            return "Move to show both shoulders clearly."
-
-        shoulder_width = abs((rs.x - ls.x) * image_width)
-        if shoulder_width < 200:
-            return "Move closer to the camera."
-        elif shoulder_width > 410:
-            return "Move farther from the camera."
-
-        center_x = (ls.x + rs.x) / 2
-        if center_x < 0.3:
-            return "Move to the right."
-        elif center_x > 0.7:
-            return "Move to the left."
-
-        if abs(ls.y - lh.y) < 0.1:
-            return "Sit up straight."
-
-        return "Camera alignment looks good."
-
-    except:
-        return "Unable to detect landmarks clearly."
+# Guided flow steps — user must pass each in order before advancing
+# Each step maps to a check function in modules/
+STEPS = [
+    "ALIGN_CAMERA",   # Step 0: get user positioned correctly in frame
+    "CHECK_POSTURE",  # Step 1: back straight, feet flat, not leaning
+    "CHECK_ARM",      # Step 2: arm resting at heart level, correct angle
+    "CHECK_CUFF",     # Step 3: cuff detected and placed correctly on arm
+    "READY",          # Step 4: all checks passed — user can take reading
+]
 
 
-def check_cuff_placement(shoulder, elbow, cuff_center):
-    arm_vec = elbow - shoulder
-    cuff_vec = cuff_center - shoulder
-    arm_length = np.linalg.norm(arm_vec)
+# ─────────────────────────────────────────────
+# INITIALIZATION
+# ─────────────────────────────────────────────
 
-    if arm_length == 0:
-        return "Arm not visible."
+# TODO: Load YOLO model from MODEL_PATH
 
-    proj_length = np.dot(cuff_vec, arm_vec) / arm_length
-    position_ratio = proj_length / arm_length
+# TODO: Initialize MediaPipe Pose with POSE_DETECTION_CONFIDENCE and POSE_TRACKING_CONFIDENCE
 
-    if position_ratio < 0.53:
-        return "Cuff is too close to shoulder. Lower it."
-    elif position_ratio > 0.9:
-        return "Cuff is too close to elbow. Raise it."
-    else:
-        return "Cuff placement looks good."
+# TODO: Initialize FeedbackManager (handles TTS + on-screen text)
+
+# TODO: Open webcam (cv2.VideoCapture), set resolution to FRAME_WIDTH x FRAME_HEIGHT
+
+# TODO: Create and size the display window ("Vita - BP Assistant")
 
 
-# ======================= Main Loop =======================
+# ─────────────────────────────────────────────
+# MAIN LOOP
+# ─────────────────────────────────────────────
+
+# TODO: Track current step index (starts at 0)
+# TODO: Track consecutive frames a step has been passing (for stability before advancing)
+#       — require N consecutive passing frames before moving to next step
+#       — prevents flickering between steps on a single good frame
+
 while True:
-    ret, frame = cap.read()
-    if not ret:
-        break
 
-    height, width, _ = frame.shape
+    # TODO: Read frame from webcam; break if frame not available
 
-    # Recolor to process
-    img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    # TODO: Flip frame horizontally (mirror view feels more natural for users)
 
-    # Make detections/process
-    results = pose.process(img_rgb)
+    # TODO: Convert BGR → RGB for MediaPipe
 
-    feedback = "Position yourself in the camera frame."
+    # TODO: Run MediaPipe Pose on the frame
 
-    if results.pose_landmarks:
-        landmarks = results.pose_landmarks.landmark
-        mp_draw.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+    # ── Step logic ────────────────────────────────
 
-        joints = {
-            "L Shoulder": mp_pose.PoseLandmark.LEFT_SHOULDER,
-            "L Elbow": mp_pose.PoseLandmark.LEFT_ELBOW,
-            "R Shoulder": mp_pose.PoseLandmark.RIGHT_SHOULDER,
-            "R Elbow": mp_pose.PoseLandmark.RIGHT_ELBOW,
-            "L Hip": mp_pose.PoseLandmark.LEFT_HIP,
-            "R Hip": mp_pose.PoseLandmark.RIGHT_HIP
-        }
+    # TODO: If no pose landmarks detected → feedback = "Stand in front of the camera"
+    #       and reset step to 0
 
-        for name, idx in joints.items():
-            lm = landmarks[idx]
-            if lm.visibility > 0.6:
-                cx, cy = int(lm.x * width), int(lm.y * height)
-                cv2.circle(frame, (cx, cy), 6, (0, 255, 0), -1)
-                cv2.putText(frame, name, (cx + 10, cy - 10),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+    # TODO: Otherwise, run the check for the current step:
+    #
+    #   Step 0 (ALIGN_CAMERA):
+    #       call check_camera_alignment(landmarks, frame_width, frame_height)
+    #       → returns (passed: bool, feedback: str)
+    #
+    #   Step 1 (CHECK_POSTURE):
+    #       call check_posture(landmarks, frame_width, frame_height)
+    #       → returns (passed: bool, feedback: str)
+    #
+    #   Step 2 (CHECK_ARM):
+    #       call check_arm(landmarks, frame_width, frame_height)
+    #       → returns (passed: bool, feedback: str)
+    #
+    #   Step 3 (CHECK_CUFF):
+    #       run YOLO on the frame to get cuff bounding box
+    #       call check_cuff_placement(landmarks, cuff_box, frame_width, frame_height)
+    #       → returns (passed: bool, feedback: str)
+    #
+    #   Step 4 (READY):
+    #       feedback = "Great! You're ready to take your reading."
+    #       no further checks needed
 
-        # Check camera alignment
-        alignment_feedback = get_camera_alignment_feedback(landmarks, width, height)
-        
-        # Check cuff placement if alignment is good
-        if alignment_feedback == "Camera alignment looks good.":
-            ls = landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER]
-            le = landmarks[mp_pose.PoseLandmark.LEFT_ELBOW]
+    # TODO: If check passed for N consecutive frames → advance to next step
+    #       If check failed → reset consecutive frame counter (do NOT go backwards in steps)
 
-            if ls.visibility > 0.6 and le.visibility > 0.6:
-                shoulder = np.array([ls.x * width, ls.y * height])
-                elbow = np.array([le.x * width, le.y * height])
+    # ── Rendering ─────────────────────────────────
 
-                results_yolo = model.predict(frame, imgsz=640, conf=0.5)
-                cuff_found = False
+    # TODO: Draw MediaPipe pose landmarks on frame
 
-                for box in results_yolo[0].boxes.xyxy.cpu().numpy():
-                    x1, y1, x2, y2 = box
-                    cuff_center = np.array([(x1 + x2) / 2, (y1 + y2) / 2])
+    # TODO: Draw YOLO cuff bounding box on frame (only during CHECK_CUFF step)
 
-                    cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
-                    cv2.circle(frame, (int(cuff_center[0]), int(cuff_center[1])), 6, (0, 0, 255), -1)
+    # TODO: Draw step progress indicator on frame (e.g. "Step 2 of 4")
 
-                    feedback = check_cuff_placement(shoulder, elbow, cuff_center)
-                    cuff_found = True
+    # TODO: Send current feedback to FeedbackManager (handles TTS + on-screen display)
 
-                if not cuff_found:
-                    feedback = "No cuff detected."
+    # TODO: Show frame with cv2.imshow
 
-            else:
-                feedback = "Arm not visible."
-        else:
-            feedback = alignment_feedback
+    # TODO: Break on ESC key (cv2.waitKey)
 
 
-        speak_if_changed(feedback)
+# ─────────────────────────────────────────────
+# CLEANUP
+# ─────────────────────────────────────────────
 
-    cv2.putText(frame, feedback, (30, 80),
-    cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 4)
-    cv2.imshow("Vita - Pose Detection", frame)
-
-    if cv2.waitKey(1) & 0xFF == 27:  # ESC to quit
-        break
-
-cap.release()
-cv2.destroyAllWindows() #oqjeofiqjwe
-#oidjgfqw
-#12312
-#basdf;ijqwe;ofjqweofqwef
-#bfqefqwef
+# TODO: cap.release()
+# TODO: cv2.destroyAllWindows()

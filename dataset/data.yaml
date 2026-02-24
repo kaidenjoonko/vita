@@ -1,0 +1,30 @@
+# YOLO Dataset Configuration
+#
+# Directory structure expected:
+#   dataset/
+#   ├── images/
+#   │   ├── train/    ← training images (~80% of total)
+#   │   └── val/      ← validation images (~20% of total)
+#   ├── labels/
+#   │   ├── train/    ← .txt annotation files matching each train image
+#   │   └── val/      ← .txt annotation files matching each val image
+#   └── data.yaml     ← this file
+#
+# Label format (YOLO):
+#   Each .txt file has one line per object:
+#   <class_id> <center_x> <center_y> <width> <height>
+#   All values are normalized 0.0–1.0 relative to image dimensions
+#   Example: 0 0.512 0.634 0.180 0.095
+#
+# Recommended labeling tool: https://roboflow.com (free tier)
+#   - Upload images from train/ folder
+#   - Draw bounding boxes around the cuff in each image
+#   - Export in "YOLOv8" format → downloads pre-split dataset + this yaml
+
+path: ./dataset
+train: images/train
+val: images/val
+
+nc: 1
+names:
+  - cuff

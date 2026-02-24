@@ -1,35 +1,167 @@
+# Vita
+
+Vita is a real-time computer vision assistant that guides users through taking an accurate blood pressure reading at home. Using a webcam, it detects body posture, arm position, and cuff placement — and gives live spoken and visual feedback before the user takes their reading.
+
+---
 
 ## The Problem
-Studies and organizations like the American Heart Association (AHA) and American Medical Association (AMA) have highlighted this issue. For instance, one study found that only 3% of patients measured their BP without error. Another states that inaccurate BP measurements can lead to inappropriate management decisions in 20% to 45% of cases. 
 
-## How BP measurement goes wrong:
-1. Patient-related
-    * Acute meal ingestion
-    * Caffeine
-    * Nicotine
-    * Full bladder
-    * Engaged in physical activity before
-    * Not resting comfortably in a quiet env
-2. Procedure-related
-    * Patient arm lower than heart
-    * Patients legs are crossed
-    * Talking 
-3. Equipment-related
-    * Cuff is too small/large
-    * Outdated equipment
-4. Physician- or health professional-related
-    * Failure to include a 5 minute reset period
-    * Failure to make multiple measurements
-    * Physician readings > nurse readings
+Studies from the American Heart Association (AHA) and American Medical Association (AMA) show that only 3% of patients take blood pressure readings without error, and that inaccurate measurements lead to inappropriate clinical decisions in 20–45% of cases. Most errors are silent — the user doesn't know they've done anything wrong.
 
+Common sources of error:
 
-## Our Vision
-We are developing an intelligent, ML-driven assistant to help people accurately take their blood pressure at home. Blood pressure measurements are highly sensitive to user errors such as incorrect cuff placement, poor posture, or arm positioning. Our solution uses real-time computer vision and AI to guide users step-by-step, ensuring reliable and consistent readings.
+| Category | Examples |
+|---|---|
+| Posture | Slouching, leaning, crossed legs, unsupported back |
+| Arm position | Arm below heart level, not resting on a surface |
+| Cuff placement | Too high (near shoulder), too low (near elbow) |
+| Environment | Talking, moving, not resting for 5 minutes prior |
+| Equipment | Cuff too small or large for the arm |
 
+Vita addresses the errors that are visually detectable in real time.
+
+---
+
+## How It Works
+
+Vita runs a guided checklist before every reading. The user must pass each step before the next one activates.
+
+```
+Step 1 → Camera alignment    (distance, centering, both shoulders visible)
+Step 2 → Posture             (back straight, not leaning, feet flat)
+Step 3 → Arm position        (elbow at heart level, slightly bent)
+Step 4 → Cuff placement      (cuff detected and positioned correctly on upper arm)
+Step 5 → Ready               (all checks passed — take your reading)
+```
+
+Each step provides spoken audio feedback and an on-screen overlay. A step only advances after passing for several consecutive frames to avoid flickering.
+
+---
+
+## ML Architecture
+
+Vita uses two models running in parallel on every frame.
+
+### MediaPipe Pose (Google)
+- Pre-trained body landmark detector — no custom training required
+- Outputs 33 keypoints (shoulders, elbows, wrists, hips, knees, ankles) with x, y, z, and visibility
+- Used for: posture checks, arm angle, heart level comparison, legs crossed detection
+- Framework: TensorFlow Lite (inference only)
+
+### YOLOv8 (Ultralytics / PyTorch)
+- Custom-trained object detector that locates the BP cuff bounding box in the frame
+- Based on YOLOv8n (nano) — optimized for real-time webcam inference on CPU
+- Fine-tuned from `yolov8n.pt` ImageNet weights via transfer learning
+- Trained on a custom dataset of BP cuff images in various positions and lighting conditions
+- Framework: PyTorch — the `.pt` weights file is a native PyTorch checkpoint
+
+### Combined inference pipeline
+
+```
+Webcam frame
+     │
+     ├──► MediaPipe Pose ──► 33 body landmarks
+     │                            └──► posture.py  (shoulder tilt, slouch, legs)
+     │                            └──► arm.py      (elbow angle, heart level)
+     │                            └──► alignment.py (distance, centering)
+     │
+     └──► YOLOv8 (PyTorch) ──► cuff bounding box
+                                    └──► cuff.py   (placement ratio on upper arm)
+```
+
+Cuff placement is determined by projecting the cuff center onto the shoulder→elbow vector extracted from MediaPipe landmarks. The ratio of that projection to the total arm length determines whether the cuff is too high, too low, or correctly placed.
+
+---
+
+## Project Structure
+
+```
+vita/
+├── main.py                  # Entry point — camera loop and step state machine
+├── capturephotos.py         # Utility to capture training images
+├── requirements.txt
+├── yolov8n.pt               # Base YOLOv8 weights (starting point for training)
+│
+├── modules/
+│   ├── alignment.py         # Step 1: camera distance and centering
+│   ├── posture.py           # Step 2: back straight, shoulder tilt, legs crossed
+│   ├── arm.py               # Step 3: elbow angle and heart level check
+│   ├── cuff.py              # Step 4: YOLO bbox → cuff placement math
+│   └── feedback.py          # TTS and on-screen overlay manager
+│
+├── dataset/
+│   ├── data.yaml            # YOLO training config (1 class: cuff)
+│   ├── images/
+│   │   ├── train/           # ~80% of labeled images
+│   │   └── val/             # ~20% of labeled images
+│   └── labels/
+│       ├── train/           # YOLO-format .txt annotation files
+│       └── val/
+│
+└── runs/                    # Auto-generated by YOLO after training
+    └── detect/trainX/weights/best.pt   # Trained cuff detector
+```
+
+---
+
+## Training the Cuff Detector
+
+### 1. Capture images
+
+```bash
+python capturephotos.py
+```
+
+Press `SPACE` to save frames to `train/`. Aim for 300–500 images with variety:
+- Cuff at different positions (correct, too high, too low)
+- Different lighting conditions, backgrounds, skin tones, and sleeve types
+- Both left and right arms
+
+### 2. Label images
+
+Upload `train/` images to [Roboflow](https://roboflow.com) (free tier). Draw bounding boxes around the cuff in each image. Export in **YOLOv8 format** — this generates the `images/`, `labels/`, and `data.yaml` structure automatically.
+
+### 3. Train
+
+```bash
+python -c "
+from ultralytics import YOLO
+model = YOLO('yolov8n.pt')
+model.train(data='dataset/data.yaml', epochs=50, imgsz=640)
+"
+```
+
+The best weights are saved to `runs/detect/trainX/weights/best.pt`. Update `MODEL_PATH` in `main.py` to point to this file.
+
+---
 
 ## Installation
+
+Requires Python 3.12 or lower.
+
 ```bash
-# Requires Python 3.12 or lower
-python -m venv vita-env
+python3 -m venv vita-env
 source vita-env/bin/activate
 pip install -r requirements.txt
+```
+
+## Running
+
+```bash
+source vita-env/bin/activate
+python main.py
+```
+
+Press `ESC` to quit.
+
+---
+
+## Dependencies
+
+| Package | Purpose |
+|---|---|
+| `ultralytics` | YOLOv8 model training and inference (wraps PyTorch) |
+| `opencv-python` | Camera capture and frame rendering |
+| `mediapipe` | Real-time body pose landmark detection |
+| `pyttsx3` | Offline text-to-speech for audio feedback |
+| `numpy` | Vector math for arm angle and cuff placement calculations |
